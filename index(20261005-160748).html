@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chibi Tactics — Auto Battle</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{
+  --bg:#10131f;--panel:#1a2030;--panel2:#222a3c;--gold:#ffd76a;--text:#f7f7fb;
+  --muted:#aab2c7;--accent:#73d9ff;--danger:#ff6d7a;--green:#6ee7a8;
+}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Tahoma,sans-serif;color:var(--text);background:radial-gradient(circle at 50% 0,#35405b,#10131f 55%);min-height:100vh}
+button,input{font:inherit}button{cursor:pointer;border:0}
+.hidden{display:none!important}.screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:linear-gradient(180deg,#252d42,#171c2b);border:1px solid #46516e;box-shadow:0 18px 60px #0008;border-radius:24px;padding:28px;width:min(760px,100%)}
+.logo{font-size:42px;font-weight:900;letter-spacing:.5px;text-align:center}.sub{text-align:center;color:var(--muted);margin:5px 0 25px}
+input{width:100%;padding:15px 17px;border-radius:14px;background:#0d111b;border:1px solid #4a5673;color:white;outline:none}
+.row{display:flex;gap:12px;flex-wrap:wrap}.row>*{flex:1}.btn{padding:13px 18px;border-radius:14px;background:#36415b;color:white;font-weight:800;border:1px solid #586685}.btn.primary{background:linear-gradient(180deg,#79dcff,#438bcf);color:#08101b}.btn.gold{background:linear-gradient(180deg,#ffe78c,#c99432);color:#251b06}.btn:disabled{opacity:.45;cursor:not-allowed}
+.small{font-size:13px;color:var(--muted)}.center{text-align:center}
+.char-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.char{padding:18px;border-radius:20px;background:#151b29;border:2px solid transparent;text-align:center;transition:.15s}.char:hover{transform:translateY(-2px)}.char.selected{border-color:var(--gold);box-shadow:0 0 25px #ffd76a33}.avatar{font-size:70px;line-height:1}.stat{font-size:12px;color:#c4cbe0;margin-top:5px}.tag{display:inline-block;padding:4px 9px;border-radius:99px;background:#303a53;color:#bfeeff;font-size:11px;margin-top:8px}
+#game{display:none;padding:10px;min-height:100vh;background:
+linear-gradient(#17221d99,#17221d99),radial-gradient(circle at 50% 40%,#7b6948,#28382b 60%,#172119);overflow:auto}
+.topbar{max-width:1500px;margin:auto;display:flex;align-items:center;gap:10px;justify-content:space-between;padding:7px}.top-left,.top-right{display:flex;gap:8px;align-items:center}.pill{background:#121827dd;border:1px solid #46536f;border-radius:14px;padding:9px 13px}.pill b{color:var(--gold)}
+.layout{max-width:1500px;margin:auto;display:grid;grid-template-columns:210px minmax(520px,1fr) 250px;gap:10px}
+.panel{background:#101522dc;border:1px solid #48536d;border-radius:16px;box-shadow:0 10px 30px #0005}.panel h3{margin:0;padding:13px 15px;border-bottom:1px solid #39445c}.traits{padding:10px}.trait{display:flex;justify-content:space-between;padding:9px 8px;border-bottom:1px solid #273047;color:#d8deef}
+.arena{position:relative;min-height:680px;border-radius:18px;overflow:hidden;border:2px solid #58684c;background:
+linear-gradient(90deg,#0001 1px,transparent 1px) 0 0/12.5% 12.5%,
+linear-gradient(#0001 1px,transparent 1px) 0 0/12.5% 12.5%,
+radial-gradient(ellipse at center,#9e885b,#776446 55%,#48523a)}
+.arena:before{content:"";position:absolute;inset:8%;border:1px solid #e7d3a233;border-radius:8px;pointer-events:none}
+.grid{position:absolute;inset:8%;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(7,1fr);gap:4px}
+.cell{border-radius:10px;border:1px solid #fff1;background:#fff1;position:relative}.cell:hover{background:#fff2}
+.units-layer{position:absolute;inset:8%;pointer-events:none;z-index:3}.board-unit{position:absolute;width:11.6%;height:13.2%;transform:translate(0,0);transition:left .34s ease,top .34s ease,transform .12s ease;pointer-events:auto}.board-unit .unit{position:absolute;inset:2px}.board-unit.enemy .unit{border-color:#ff7373;background:linear-gradient(#552b32dd,#18121bee)}.board-unit.hit{transform:scale(1.08)}.board-unit.dead{opacity:.25;filter:grayscale(1)}.damage-pop{position:absolute;left:50%;top:-18px;transform:translateX(-50%);font-weight:900;color:#ffdc6a;text-shadow:0 2px 4px #000;animation:damageUp .55s ease forwards;z-index:8;pointer-events:none}@keyframes damageUp{to{top:-42px;opacity:0}}.cell.player-zone{background:#5aa0c21a}.cell.enemy-zone{background:#d45b5b12}.cell.selected-cell{outline:2px solid var(--gold);background:#ffd76a20}.battle-line{position:absolute;left:8%;right:8%;top:43%;height:2px;background:#fff2;z-index:1}.combat-banner{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:5;background:#111827dd;border:1px solid #596783;padding:7px 14px;border-radius:99px;font-weight:800;display:none}
+.unit{position:absolute;inset:5px;border-radius:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(#34445fcc,#131a29ee);border:2px solid #91b7d9;box-shadow:0 5px 15px #0007;z-index:2;user-select:none}
+.unit.enemy{border-color:#ff7373;background:linear-gradient(#552b32dd,#18121bee)}.unit .uicon{font-size:34px;line-height:1}.unit .uname{font-size:10px;font-weight:900}.hp{height:5px;width:75%;background:#361b22;border-radius:9px;overflow:hidden;margin-top:2px}.hp>i{display:block;height:100%;background:#5ce58e;width:100%}.mana{font-size:9px;color:#8fdfff}
+.floating{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:5;background:#111827dd;border:1px solid #596783;padding:7px 16px;border-radius:99px;font-weight:800}
+.bottom{max-width:1500px;margin:10px auto 0;display:grid;grid-template-columns:160px 1fr 250px;gap:10px}.xpbox,.shopbox,.sidebox{background:#101522ee;border:1px solid #48536d;border-radius:16px;padding:12px}.goldbig{font-size:30px;font-weight:900;color:var(--gold)}.shop{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.shop-card{background:#20283a;border:1px solid #4b5876;border-radius:13px;padding:8px;text-align:center}.shop-card .avatar{font-size:34px}.shop-card b{font-size:12px}.shop-card button{margin-top:5px;width:100%;padding:6px;border-radius:8px;background:#36415b;color:white}.bench{max-width:1500px;margin:8px auto;display:flex;gap:8px;min-height:76px;padding:7px;background:#0e1420d9;border:1px solid #48536d;border-radius:16px}.bench .unit{position:relative;inset:auto;width:78px;height:62px;flex:none}
+.items{display:flex;gap:7px;flex-wrap:wrap;padding:10px}.item{padding:8px;border-radius:10px;background:#29334a;border:1px solid #586985;min-width:65px;text-align:center}.item b{display:block;font-size:11px}.item span{font-size:25px}
+.modal{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}.modal .card{max-width:700px}.answers{display:grid;gap:10px;margin-top:15px}.answers button{text-align:left;background:#27324a;border:1px solid #53617d;padding:14px;border-radius:12px;color:white}.answers button:hover{background:#35425e}
+.score{font-size:22px;font-weight:900}.notice{padding:9px 12px;border-radius:10px;background:#182136;color:#cbd5ef;margin-top:10px}.partycode{font-size:36px;letter-spacing:6px;text-align:center;font-weight:900;color:var(--gold);padding:12px}
+@media(max-width:1050px){.layout{grid-template-columns:1fr}.panel.left,.panel.right{display:none}.arena{min-height:600px}.bottom{grid-template-columns:1fr}.char-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.logo{font-size:32px}.char-grid{grid-template-columns:1fr}.arena{min-height:520px}.grid{inset:5%}.shop{grid-template-columns:repeat(5,minmax(72px,1fr));overflow:auto}.shop-card{min-width:72px}.unit .uicon{font-size:25px}.unit .uname{font-size:8px}}
+</style>
+</head>
+<body>
+
+<section id="login" class="screen">
+  <div class="card">
+    <div class="logo">🐣 CHIBI TACTICS</div>
+    <div class="sub">Auto Battle • Party Duel • Item & Cosmetic</div>
+    <label>ชื่อผู้เล่น</label>
+    <input id="playerName" maxlength="16" placeholder="ตั้งชื่อในเกมของคุณ">
+    <div class="row" style="margin-top:14px">
+      <button class="btn primary" onclick="goSelect()">เริ่มเกม</button>
+      <button class="btn" onclick="openParty()">เข้าปาร์ตี้</button>
+    </div>
+    <div class="notice">เวอร์ชันนี้เป็นเกมเว็บไฟล์เดียว เล่นได้บน GitHub Pages และมีระบบห้อง/โค้ดสำหรับเดโม 1v1</div>
+  </div>
+</section>
+
+<section id="select" class="screen hidden">
+  <div class="card">
+    <h1 class="center">เลือกตัวละครเริ่มต้น</h1>
+    <p class="sub">ตัวละครแต่ละตัวมีสไตล์การเล่นต่างกัน</p>
+    <div class="char-grid" id="charGrid"></div>
+    <div class="row" style="margin-top:18px">
+      <button class="btn" onclick="show('login')">ย้อนกลับ</button>
+      <button class="btn gold" onclick="startGame()">เข้าสู่สนาม</button>
+    </div>
+  </div>
+</section>
+
+<section id="game">
+  <div class="topbar">
+    <div class="top-left">
+      <div class="pill">รอบ <b id="round">1-1</b></div>
+      <div class="pill">Lv.<b id="level">3</b></div>
+      <div class="pill">❤️ <b id="hp">100</b></div>
+    </div>
+    <div class="pill">ผู้เล่น: <b id="playerLabel">Player</b></div><div class="pill">⭐ พ้อยท์ <b id="points">0</b></div>
+    <div class="top-right">
+      <button class="btn" onclick="openParty()">👥 ปาร์ตี้</button>
+      <button class="btn" onclick="openUpgrade()">⬆️ อัปตัวละคร</button>
+      <button class="btn" onclick="openQuestion()">🧠 วัดใจ</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="panel left">
+      <h3>Synergy</h3>
+      <div class="traits">
+        <div class="trait">🛡️ Guardian <b id="guardian">1/4</b></div>
+        <div class="trait">✨ Lucky <b id="lucky">1/3</b></div>
+        <div class="trait">🐾 Chibi <b id="chibi">1/3</b></div>
+        <div class="trait">🔥 Brave <b id="brave">0/2</b></div>
+      </div>
+      <h3>คะแนน</h3><div class="traits"><div class="score" id="score">0</div><div class="small">คะแนนสะสม</div></div>
+      <h3>คู่แข่ง</h3><div class="traits" id="opponents"></div>
+    </aside>
+
+    <main>
+      <div class="arena">
+        <div class="floating" id="battleStatus">เตรียมจัดทีม</div>
+        <div class="grid" id="grid"></div><div class="units-layer" id="unitsLayer"></div>
+      </div>
+    </main>
+
+    <aside class="panel right">
+      <h3>🎒 ไอเท็ม</h3>
+      <div class="items" id="items"></div>
+      <h3>👕 ตกแต่ง</h3>
+      <div class="items">
+        <button class="btn" onclick="cycleSkin()">เปลี่ยนสกิน</button>
+        <div class="small" id="skinName">Classic</div>
+      </div>
+      <h3>⚔️ การต่อสู้</h3>
+      <div class="traits">
+        <div class="small">ทีมของคุณจะโจมตีอัตโนมัติเมื่อเริ่มรอบ</div>
+        <button class="btn primary" style="width:100%;margin-top:10px" onclick="startBattle()">เริ่มต่อสู้</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="bottom">
+    <div class="xpbox">
+      <div class="small">Gold</div><div class="goldbig">🪙 <span id="gold">10</span></div>
+      <div class="small">EXP <span id="exp">0</span>/6</div>
+      <button class="btn" style="width:100%;margin-top:7px" onclick="buyXP()">ซื้อ XP • 4 🪙</button>
+      <button class="btn" style="width:100%;margin-top:7px" onclick="reroll()">สุ่มร้าน • 2 🪙</button>
+    </div>
+    <div class="shopbox"><div class="small" style="margin-bottom:8px">ร้านค้า</div><div class="shop" id="shop"></div></div>
+    <div class="sidebox">
+      <div class="small">พ้อยท์ใช้พัฒนาตัวละคร</div><b>⭐ <span id="pointsBottom">0</span> Points</b>
+      <button class="btn" style="width:100%;margin-top:8px" onclick="openUpgrade()">⬆️ อัปเกรดตัวละคร</button>
+      <div class="small" style="margin-top:10px">ทีมบนกระดาน</div><b id="teamCount">0 / 6</b>
+      <div class="small" style="margin-top:8px">คลิกช่องเพื่อย้ายตัวละคร</div>
+      <button class="btn gold" style="width:100%;margin-top:9px" onclick="openQuestion()">🧠 คำถามวัดใจ</button>
+    </div>
+  </div>
+  <div class="bench" id="bench"></div>
+</section>
+
+<div id="partyModal" class="modal hidden">
+ <div class="card">
+  <h2 class="center">👥 Party Duel</h2>
+  <p class="sub">สร้างรหัสให้เพื่อน หรือกรอกรหัสเพื่อเข้าห้อง</p>
+  <div class="partycode" id="partyCode">------</div>
+  <div class="row">
+   <button class="btn gold" onclick="createParty()">สร้างรหัสใหม่</button>
+   <button class="btn" onclick="copyCode()">คัดลอกรหัส</button>
+  </div>
+  <div style="margin:18px 0;border-top:1px solid #3c4862"></div>
+  <input id="joinCode" placeholder="กรอกรหัส 6 ตัวของอีกคน">
+  <button class="btn primary" style="width:100%;margin-top:9px" onclick="joinParty()">เข้าร่วมปาร์ตี้ออนไลน์</button>
+  <div class="row" style="margin-top:9px">
+   <button class="btn" onclick="partyReady()">✅ พร้อมดวล</button>
+   <button class="btn gold" onclick="partyDuel()">⚔️ ท้าดวล</button>
+  </div>
+  <div id="partyMsg" class="notice">สร้างห้องแล้วส่งรหัส 6 ตัวให้เพื่อน จากนั้นอีกเครื่องกรอกรหัสนี้เพื่อเชื่อมต่อออนไลน์</div>
+  <button class="btn" style="width:100%;margin-top:10px" onclick="closeParty()">ปิด</button>
+ </div>
+</div>
+
+<div id="questionModal" class="modal hidden">
+ <div class="card">
+  <div class="small">🧠 คำถามวัดใจ</div>
+  <h2 id="qText"></h2>
+  <div class="answers" id="answers"></div>
+  <div class="notice">เลือกคำตอบให้ถูกต้อง เพราะคำตอบมีเฉลยและส่งผลต่อคะแนน/บัฟทีม</div>
+ </div>
+</div>
+
+<div id="upgradeModal" class="modal hidden">
+ <div class="card">
+  <div class="small">⭐ Character Progression</div>
+  <h2 class="center">อัปเกรดตัวละคร</h2>
+  <p class="sub">สะสมพ้อยท์จากการชนะและตอบคำถาม แล้วนำมาเพิ่ม Lv. ตัวละคร</p>
+  <div class="notice center">พ้อยท์ของคุณ: <b style="color:var(--gold);font-size:20px">⭐ <span id="upgradePoints">0</span></b></div>
+  <div id="upgradeList" class="char-grid" style="margin-top:14px"></div>
+  <button class="btn" style="width:100%;margin-top:14px" onclick="closeUpgrade()">ปิด</button>
+ </div>
+</div>
+
+<script>
+const CHARS={
+ chick:{name:"ลูกเจี๊ยบ",icon:"🐥",cost:1,hp:100,atk:18,def:8,skill:"เร็วและหลบเก่ง",trait:"Lucky"},
+ duck:{name:"เป็ด",icon:"🦆",cost:2,hp:150,atk:20,def:13,skill:"รับดาเมจได้ดี",trait:"Guardian"},
+ bear:{name:"หมีเนย",icon:"🧸",cost:3,hp:190,atk:28,def:16,skill:"ตีหนัก",trait:"Brave"}
+};
+let state={name:"Player",chosen:"chick",gold:10,level:3,exp:0,hp:100,score:0,points:0,round:1,team:[],bench:[],items:["⚔️ ดาบฝึกหัด","🛡️ โล่จิ๋ว"],skin:0,shop:[],enemy:[],battle:false,upgrades:{chick:1,duck:1,bear:1}};
+let selected=null, battleTimer=null;
+let party={peer:null,conn:null,role:null,code:null,opponent:null,connected:false,ready:false,opponentReady:false};
+loadProgress();
+const skins=[["Classic","🌟"],["Strawberry","🍓"],["Ocean","🌊"],["Galaxy","🌌"]];
+function uid(){return Date.now()+Math.random()}
+function show(id){["login","select"].forEach(x=>document.getElementById(x).classList.add("hidden"));document.getElementById(id).classList.remove("hidden")}
+function goSelect(){let n=document.getElementById("playerName").value.trim();if(!n){alert("กรุณาตั้งชื่อก่อน");return}state.name=n;renderChars();show("select")}
+function renderChars(){document.getElementById("charGrid").innerHTML=Object.entries(CHARS).map(([id,c])=>`<div class="char ${state.chosen===id?"selected":""}" onclick="choose('${id}')"><div class="avatar">${c.icon}</div><h3>${c.name}</h3><div>${c.skill}</div><div class="stat">❤️ ${c.hp} • ⚔️ ${c.atk} • 🛡️ ${c.def}</div><span class="tag">${c.trait}</span><div class="small">ราคา ${c.cost} 🪙</div></div>`).join("")}
+function choose(id){state.chosen=id;renderChars()}
+function startGame(){if(battleTimer)clearInterval(battleTimer);state.team=[];state.bench=[];state.enemy=[];state.battle=false;selected=null;state.points=state.points||0;state.upgrades=state.upgrades||{chick:1,duck:1,bear:1};showGame();addUnit(state.chosen);reroll(true);render();document.getElementById("battleStatus").textContent="ซื้อยูนิต แล้วลาก/คลิกลงกระดาน"}
+function showGame(){document.getElementById("login").classList.add("hidden");document.getElementById("select").classList.add("hidden");document.getElementById("game").style.display="block";document.getElementById("playerLabel").textContent=state.name}
+function getStats(id){let c=CHARS[id],lv=(state.upgrades&&state.upgrades[id])||1,m=1+(lv-1)*0.09;return {hp:Math.round(c.hp*m),atk:Math.round(c.atk*(1+(lv-1)*0.085)),def:Math.round(c.def*(1+(lv-1)*0.06)),level:lv}}
+function addUnit(id){let st=getStats(id);state.bench.push({id,uid:uid(),hp:st.hp,maxHp:st.hp,atk:st.atk,def:st.def,mana:0,cell:null})}
+function reroll(free=false){if(state.battle)return;if(!free){if(state.gold<2)return alert("Gold ไม่พอ");state.gold-=2}let ids=Object.keys(CHARS);state.shop=Array.from({length:5},()=>ids[Math.floor(Math.random()*ids.length)]);render()}
+function buy(id){if(state.battle)return;let c=CHARS[id];if(state.gold<c.cost)return alert("Gold ไม่พอ");if(state.team.length+state.bench.length>=10)return alert("ยูนิตสำรองเต็ม");state.gold-=c.cost;addUnit(id);render()}
+function buyXP(){if(state.battle)return;if(state.level>=9)return alert("ถึง Level สูงสุดแล้ว");if(state.gold<4)return alert("Gold ไม่พอ");state.gold-=4;state.exp+=4;while(state.exp>=6&&state.level<9){state.exp-=6;state.level++;state.score+=10;state.points+=2}saveProgress();render()}
+function canPlace(){return state.team.length<Math.min(6,state.level)}
+function placeBench(i,cell=null){if(state.battle)return;if(!canPlace())return alert("ทีมเต็มแล้ว • เพิ่ม Level เพื่อวางยูนิตเพิ่ม");if(cell===null)cell=firstEmptyPlayerCell();if(cell===null)return alert("ช่องฝั่งคุณเต็มแล้ว");if(state.team.some(x=>x.cell===cell))return alert("ช่องนี้มีตัวละครอยู่แล้ว");let u=state.bench.splice(i,1)[0];u.cell=cell;state.team.push(u);selected=u.uid;render();document.getElementById("battleStatus").textContent="วางแล้ว • คลิก/ลากตัวละครเพื่อย้ายตำแหน่ง"}
+function firstEmptyPlayerCell(){for(let r=4;r<7;r++)for(let c=0;c<8;c++){let x=r*8+c;if(!state.team.some(u=>u.cell===x))return x}return null}
+function selectUnit(uid){if(state.battle)return;selected=uid;renderGrid();document.getElementById("battleStatus").textContent="เลือกตัวละครแล้ว • คลิกช่องว่างฝั่งคุณเพื่อย้าย"}
+function moveUnit(cell){if(state.battle||selected==null)return;if(Math.floor(cell/8)<4)return;let u=state.team.find(x=>x.uid===selected);if(!u)return;let other=state.team.find(x=>x.cell===cell);if(other&&other.uid!==u.uid){let old=u.cell;u.cell=other.cell;other.cell=old}else u.cell=cell;selected=null;render()}
+function boardDrag(uid,e){if(state.battle)return;selected=uid;e.dataTransfer.setData('teamUid',String(uid))}
+function render(){document.getElementById("points").textContent=state.points||0;document.getElementById("pointsBottom").textContent=state.points||0;document.getElementById("gold").textContent=state.gold;document.getElementById("level").textContent=state.level;document.getElementById("hp").textContent=state.hp;document.getElementById("score").textContent=state.score;document.getElementById("exp").textContent=state.exp;document.getElementById("round").textContent=`${Math.ceil(state.round/3)}-${((state.round-1)%3)+1}`;document.getElementById("teamCount").textContent=`${state.team.length} / ${Math.min(6,state.level)}`;document.getElementById("items").innerHTML=state.items.map(x=>`<div class="item"><span>${x.split(" ")[0]}</span><b>${x.substring(x.indexOf(" ")+1)}</b></div>`).join("");document.getElementById("skinName").textContent=skins[state.skin][0]+" "+skins[state.skin][1];document.getElementById("bench").innerHTML=state.bench.map((u,i)=>{let c=CHARS[u.id],lv=(state.upgrades&&state.upgrades[u.id])||1;return `<div class="unit" draggable="true" ondragstart="benchDrag(${i},event)" onclick="placeBench(${i})"><div class="uicon">${c.icon}</div><div class="uname">${c.name} Lv.${lv}</div></div>`}).join("");document.getElementById("shop").innerHTML=state.shop.map(id=>{let c=CHARS[id];return `<div class="shop-card"><div class="avatar">${c.icon}</div><b>${c.name}</b><div class="small">${c.cost} 🪙</div><button onclick="buy('${id}')">ซื้อ</button></div>`}).join("");renderGrid();renderOpponents()}
+function benchDrag(i,e){e.dataTransfer.setData("benchIndex",String(i))}
+function renderGrid(){let g=document.getElementById("grid"),layer=document.getElementById("unitsLayer");g.innerHTML="";for(let i=0;i<56;i++){let cell=document.createElement("div");cell.className="cell "+(Math.floor(i/8)>=4?"player-zone":"enemy-zone")+(selected!=null&&state.team.some(u=>u.uid===selected&&u.cell===i)?" selected-cell":"");cell.dataset.cell=i;cell.onclick=()=>moveUnit(i);cell.ondragover=e=>e.preventDefault();cell.ondrop=e=>{e.preventDefault();let idx=e.dataTransfer.getData("benchIndex");let teamUid=e.dataTransfer.getData("teamUid");if(idx!==""){let ci=Number(idx);placeBench(ci,i)}else if(teamUid!==""){selected=Number(teamUid);moveUnit(i)}};g.appendChild(cell)}layer.innerHTML="";const all=[...state.team,...state.enemy];all.forEach(u=>{if(u.cell==null||u.hp<=0)return;let c=CHARS[u.id],col=u.cell%8,row=Math.floor(u.cell/8);let el=document.createElement("div");el.className="board-unit "+(u.enemy?"enemy ":"")+(u.hp<=0?"dead ":"");el.style.left=`${col*12.5+0.45}%`;el.style.top=`${row*(100/7)+0.45}%`;el.innerHTML=`<div class="unit" ${u.enemy?'':'draggable="true" ondragstart="boardDrag('+u.uid+',event)" onclick="selectUnit('+u.uid+')"'}><div class="uicon">${c.icon}</div><div class="uname">${c.name}</div><div class="hp"><i style="width:${Math.max(0,u.hp/u.maxHp*100)}%"></i></div><div class="mana">⚡ ${Math.round(u.mana||0)}</div></div>`;layer.appendChild(el)});}
+function renderOpponents(){document.getElementById("opponents").innerHTML=["🐥 Bot_01","🦆 Bot_02","🧸 Bot_03","🐼 Bot_04"].map((x,i)=>`<div class="trait"><span>${x}</span><b>${Math.max(1,100-i*12)} ❤️</b></div>`).join("")}
+function makeEnemyTeam(){let ids=Object.keys(CHARS);let count=Math.min(3+Math.floor(state.round/4),5);let arr=[];for(let i=0;i<count;i++){let id=ids[Math.floor(Math.random()*ids.length)],c=CHARS[id];arr.push({id,uid:uid(),hp:Math.round(c.hp*(1+state.round*.07)),maxHp:Math.round(c.hp*(1+state.round*.07)),atk:Math.round(c.atk*(1+state.round*.055)),def:c.def,mana:0,cell:(i<4?i*2+1:7),enemy:true})}return arr}
+function nearestEnemy(u, enemies){let alive=enemies.filter(x=>x.hp>0);if(!alive.length)return null;return alive.reduce((best,x)=>{let d=Math.abs((u.cell%8)-(x.cell%8))+Math.abs(Math.floor(u.cell/8)-Math.floor(x.cell/8));let bd=best?Math.abs((u.cell%8)-(best.cell%8))+Math.abs(Math.floor(u.cell/8)-Math.floor(best.cell/8)):999;return d<bd?x:best},null)}
+function stepToward(u,target){let r=Math.floor(u.cell/8),c=u.cell%8,tr=Math.floor(target.cell/8),tc=target.cell%8;let nr=r,nc=c;if(Math.abs(tr-r)>=Math.abs(tc-c)){nr+=Math.sign(tr-r)}else nc+=Math.sign(tc-c);let next=nr*8+nc;if(next!==target.cell&&![...state.team,...state.enemy].some(x=>x!==u&&x.hp>0&&x.cell===next))u.cell=next}
+function attackUnit(attacker,target){let dmg=Math.max(3,Math.round(attacker.atk-target.def*.45+Math.random()*6));target.hp=Math.max(0,target.hp-dmg);attacker.mana=Math.min(100,(attacker.mana||0)+20);flashHit(target,dmg);return dmg}
+function flashHit(target,dmg){setTimeout(()=>{let nodes=[...document.querySelectorAll('.board-unit')];let idx=nodes.findIndex(n=>n.innerHTML.includes(CHARS[target.id].name));if(idx>=0){nodes[idx].classList.add('hit');setTimeout(()=>nodes[idx]?.classList.remove('hit'),120)}},0)}
+function showDamage(dmg,cell){let layer=document.getElementById('unitsLayer'),el=document.createElement('div');let col=cell%8,row=Math.floor(cell/8);el.className='damage-pop';el.textContent='-'+dmg;el.style.left=`${col*12.5+6}%`;el.style.top=`${row*(100/7)+1}%`;layer.appendChild(el);setTimeout(()=>el.remove(),600)}
+function startBattle(){if(state.battle)return;if(!state.team.length)return alert("วางตัวละครลงกระดานก่อน");state.enemy=makeEnemyTeam();state.battle=true;selected=null;document.getElementById("battleStatus").textContent="⚔️ ต่อสู้อัตโนมัติ!";renderGrid();let tick=0;battleTimer=setInterval(()=>{tick++;let hits=[];let pAlive=state.team.filter(u=>u.hp>0),eAlive=state.enemy.filter(u=>u.hp>0);if(!pAlive.length||!eAlive.length){finishBattle(pAlive.length>0);return}let all=[...pAlive,...eAlive];for(const u of all){if(u.hp<=0)continue;let foes=u.enemy?state.team:state.enemy;let t=nearestEnemy(u,foes);if(!t)continue;let dist=Math.abs((u.cell%8)-(t.cell%8))+Math.abs(Math.floor(u.cell/8)-Math.floor(t.cell/8));if(dist>1){stepToward(u,t)}else{let dmg=attackUnit(u,t);hits.push({dmg,cell:t.cell})}}renderGrid();hits.forEach(h=>showDamage(h.dmg,h.cell));if(tick>90)finishBattle(state.team.some(u=>u.hp>0));},480)}
+function endRoundEconomy(){const interest=Math.min(5,Math.floor(state.gold/10));const base=5;state.gold+=base+interest;return {base,interest}}
+function finishBattle(win){if(battleTimer){clearInterval(battleTimer);battleTimer=null}state.battle=false;if(win){state.score+=20+state.round*2;state.points+=3;state.items.push("✨ เหรียญชัยชนะ");const income=endRoundEconomy();document.getElementById("battleStatus").textContent=`🏆 ชนะ! +${income.base+income.interest} Gold (ดอกเบี้ย ${income.interest})`}else{let dmg=5+Math.floor(Math.random()*10);state.hp=Math.max(0,state.hp-dmg);state.score=Math.max(0,state.score-5);state.points+=1;const income=endRoundEconomy();document.getElementById("battleStatus").textContent=`💥 แพ้การต่อสู้ -${dmg} HP • +${income.base+income.interest} Gold`;if(state.hp<=0){alert("จบเกม! คะแนน "+state.score);state.hp=100;state.score=0;state.round=1}}state.team.forEach(u=>{let st=getStats(u.id);u.hp=st.hp;u.maxHp=st.hp;u.atk=st.atk;u.def=st.def;u.mana=0});state.enemy=[];state.round++;saveProgress();render()}
+function cycleSkin(){state.skin=(state.skin+1)%skins.length;state.score+=2;render()}
+function upgradeCost(lv){return 4+(lv-1)*3}
+function openUpgrade(){document.getElementById("upgradeModal").classList.remove("hidden");renderUpgrades()}
+function closeUpgrade(){document.getElementById("upgradeModal").classList.add("hidden")}
+function renderUpgrades(){const el=document.getElementById("upgradeList");document.getElementById("upgradePoints").textContent=state.points||0;el.innerHTML=Object.entries(CHARS).map(([id,c])=>{let lv=(state.upgrades&&state.upgrades[id])||1,cost=upgradeCost(lv),st=getStats(id),max=lv>=10;return `<div class="char"><div class="avatar">${c.icon}</div><h3>${c.name}</h3><span class="tag">Lv.${lv}${max?" MAX":""}</span><div class="stat">❤️ ${st.hp} • ⚔️ ${st.atk} • 🛡️ ${st.def}</div><div class="small" style="margin-top:8px">${max?"อัปเต็มแล้ว":"อัปครั้งถัดไปประมาณ +9% HP / +8.5% ATK"}</div><button class="btn gold" style="width:100%;margin-top:10px" ${max||state.points<cost?"disabled":""} onclick="upgradeCharacter('${id}')">${max?"MAX":"อัปเกรด • ⭐ "+cost}</button></div>`}).join("")}
+function saveProgress(){localStorage.setItem("chibiProgress",JSON.stringify({points:state.points||0,upgrades:state.upgrades||{chick:1,duck:1,bear:1},score:state.score||0}))}
+function loadProgress(){try{let p=JSON.parse(localStorage.getItem("chibiProgress")||"null");if(p){state.points=Number(p.points)||0;state.score=Number(p.score)||0;state.upgrades=Object.assign({chick:1,duck:1,bear:1},p.upgrades||{})}}catch(e){}}
+function upgradeCharacter(id){let lv=(state.upgrades&&state.upgrades[id])||1,cost=upgradeCost(lv);if(lv>=10)return;if((state.points||0)<cost)return alert(`ต้องใช้ ${cost} พ้อยท์`);state.points-=cost;state.upgrades[id]=lv+1;state.score+=15;state.bench.forEach(u=>{if(u.id===id){let st=getStats(id);u.maxHp=st.hp;u.hp=st.hp;u.atk=st.atk;u.def=st.def}});state.team.forEach(u=>{if(u.id===id){let st=getStats(id);u.maxHp=st.hp;u.hp=Math.min(u.hp,st.hp);u.atk=st.atk;u.def=st.def}});saveProgress();render();renderUpgrades()}
+const questions=[
+  {q:"ตัวละครตัวใดมีค่า HP พื้นฐานสูงที่สุด?",a:["🐥 ลูกเจี๊ยบ","🦆 เป็ด","🧸 หมีเนย","ทั้งสามตัวเท่ากัน"],correct:2,explain:"หมีเนยมี HP พื้นฐาน 190 สูงกว่าเป็ด 150 และลูกเจี๊ยบ 100"},
+  {q:"ถ้าต้องการเพิ่มความแข็งแกร่งของทีมในระยะยาว สิ่งใดเหมาะสมที่สุด?",a:["ใช้ทองทั้งหมดทันที","บริหาร Gold และ EXP ให้เหมาะกับสถานการณ์","ไม่ซื้อยูนิตเลย","กดสุ่มร้านทุกครั้งที่มีทอง"],correct:1,explain:"การบริหาร Gold และ EXP ช่วยให้ทีมเติบโตได้สม่ำเสมอและมีทรัพยากรสำหรับรอบสำคัญ"},
+  {q:"ข้อใดคือหน้าที่หลักของระบบ Auto Battle?",a:["ให้ผู้เล่นควบคุมการโจมตีทุกครั้ง","ให้ตัวละครต่อสู้เองหลังจากผู้เล่นจัดทีม","สุ่มผู้ชนะโดยไม่ใช้ทีม","หยุดการต่อสู้เมื่อเริ่มรอบ"],correct:1,explain:"Auto Battle ให้ตัวละครต่อสู้โดยอัตโนมัติ ส่วนผู้เล่นเน้นการวางแผนทีมและตำแหน่ง"},
+  {q:"ถ้ายูนิตมี HP 100 และเสีย HP ไป 35 จะเหลือ HP เท่าไร?",a:["55","65","75","85"],correct:1,explain:"100 - 35 = 65 HP"},
+  {q:"ไอเท็มประเภทเพิ่มพลังโจมตีควรเหมาะกับตัวละครแบบใดมากที่สุด?",a:["ตัวที่เน้นสร้างดาเมจ","ตัวที่ไม่โจมตี","ตัวที่ถูกขายไปแล้ว","ไม่มีผลกับตัวละคร"],correct:0,explain:"โบนัสพลังโจมตีมีประโยชน์มากกับยูนิตที่มีหน้าที่สร้างดาเมจ"},
+  {q:"หากทีมของคุณเสียเปรียบจากการยืนตำแหน่ง สิ่งใดควรทำก่อน?",a:["จัดตำแหน่งใหม่","ออกจากเกม","ลบทีมทั้งหมด","ใช้ทองทั้งหมดทันที"],correct:0,explain:"การจัดตำแหน่งเป็นหนึ่งในปัจจัยสำคัญของ Auto Battle และทำได้โดยไม่ต้องใช้ Gold"},
+  {q:"ข้อใดเป็นการใช้ Gold อย่างระมัดระวังที่สุด?",a:["ใช้จนเหลือ 0 ทุกตา","ซื้อทุกอย่างที่เห็น","เก็บ Gold ไว้และใช้เมื่อจำเป็น","ไม่สนใจ Gold"],correct:2,explain:"การเก็บทรัพยากรไว้ใช้ในจังหวะสำคัญช่วยให้มีทางเลือกมากขึ้นในรอบต่อไป"},
+  {q:"ถ้าตัวละครมี ATK 20 และได้รับโบนัส ATK +5 จะมี ATK เท่าไร?",a:["15","20","25","30"],correct:2,explain:"20 + 5 = 25 ATK"}
+];
+let currentQuestion=null;
+function openQuestion(){
+  currentQuestion=questions[Math.floor(Math.random()*questions.length)];
+  document.getElementById("qText").textContent=currentQuestion.q;
+  document.getElementById("answers").innerHTML=currentQuestion.a.map((a,i)=>`<button onclick="answer(${i})">${String.fromCharCode(65+i)}. ${a}</button>`).join("");
+  document.getElementById("questionModal").classList.remove("hidden");
+}
+function answer(i){
+  if(!currentQuestion)return;
+  const correct=i===currentQuestion.correct;
+  const buttons=[...document.querySelectorAll("#answers button")];
+  buttons.forEach((b,idx)=>{
+    b.disabled=true;
+    if(idx===currentQuestion.correct)b.style.borderColor="var(--green)";
+    if(idx===i&&!correct)b.style.borderColor="var(--danger)";
+  });
+  if(correct){
+    const bonus=20;
+    state.score+=bonus;
+    state.gold+=2;
+    state.points+=2;
+    saveProgress();
+    state.team.forEach(u=>{u.atk+=2;u.def+=1});
+    document.getElementById("battleStatus").textContent=`✅ ตอบถูก! +${bonus} คะแนน +2 Gold`;
+  }else{
+    const penalty=8;
+    state.score=Math.max(0,state.score-penalty);
+    state.points+=1;
+    document.getElementById("battleStatus").textContent=`❌ ตอบผิด! -${penalty} คะแนน`;
+  }
+  const result=document.createElement("div");
+  result.className="notice";
+  result.style.marginTop="12px";
+  result.innerHTML=(correct?"<b style='color:var(--green)'>✅ ถูกต้อง!</b>":"<b style='color:var(--danger)'>❌ คำตอบไม่ถูกต้อง</b>")+`<br>${currentQuestion.explain}`;
+  document.getElementById("answers").appendChild(result);
+  setTimeout(()=>{document.getElementById("questionModal").classList.add("hidden");currentQuestion=null;render()},1600);
+}
+function makeCode(){return Math.random().toString(36).slice(2,8).toUpperCase()}
+function partyMsg(msg){document.getElementById("partyMsg").textContent=msg}
+function destroyPartyPeer(){try{party.conn?.close()}catch(e){}try{party.peer?.destroy()}catch(e){}party={peer:null,conn:null,role:null,code:null,opponent:null,connected:false,ready:false,opponentReady:false}}
+function openParty(){document.getElementById("partyModal").classList.remove("hidden");if(party.code)document.getElementById("partyCode").textContent=party.code}
+function closeParty(){document.getElementById("partyModal").classList.add("hidden")}
+function createParty(){
+  if(typeof Peer==='undefined'){partyMsg("โหลดระบบห้องออนไลน์ไม่สำเร็จ กรุณาเปิดอินเทอร์เน็ตแล้วรีเฟรชหน้า");return}
+  destroyPartyPeer();
+  const code=makeCode(); party.role='host';party.code=code;document.getElementById("partyCode").textContent=code;partyMsg("กำลังสร้างห้องออนไลน์...");
+  const peer=new Peer(code,{debug:1}); party.peer=peer;
+  peer.on('open',id=>{party.code=id.toUpperCase();document.getElementById("partyCode").textContent=party.code;partyMsg("🟢 ห้องพร้อมแล้ว ส่งรหัสนี้ให้อีกคนได้เลย");});
+  peer.on('connection',conn=>{if(party.conn&&party.conn.open){conn.close();return} setupPartyConnection(conn,'host');});
+  peer.on('error',err=>{if(err.type==='unavailable-id'){partyMsg("รหัสชนกัน กำลังสร้างรหัสใหม่...");setTimeout(createParty,250)}else partyMsg("ห้องมีปัญหา: "+(err.type||err.message));});
+}
+function setupPartyConnection(conn,role){
+  party.conn=conn;party.role=role;
+  conn.on('open',()=>{party.connected=true;party.opponentReady=false;partyMsg(`🟢 เชื่อมต่อสำเร็จ • ${role==='host'?'รอผู้เล่นเข้าห้อง':'เข้าห้อง '+party.code+' สำเร็จ'}`);
+    conn.send({type:'hello',name:state.name,score:state.score,level:state.level});
+  });
+  conn.on('data',handlePartyData);
+  conn.on('close',()=>{party.connected=false;party.opponent=null;partyMsg("🔴 อีกคนออกจากห้องแล้ว");});
+  conn.on('error',()=>{party.connected=false;partyMsg("🔴 การเชื่อมต่อขัดข้อง");});
+}
+function handlePartyData(msg){
+  if(!msg||!msg.type)return;
+  if(msg.type==='hello'){party.opponent=msg;partyMsg(`🟢 พบ ${msg.name} แล้ว • กด “พร้อมดวล” ทั้งสองคน`);return}
+  if(msg.type==='ready'){party.opponentReady=true;partyMsg(`⚔️ ${msg.name||'คู่แข่ง'} พร้อมดวลแล้ว`);if(party.ready&&party.role==='host')startOnlineDuel();return}
+  if(msg.type==='duelRequest'){partyMsg(`⚔️ ${msg.name||'คู่แข่ง'} ท้าดวล! กด “พร้อมดวล” เพื่อรับคำท้า`);return}
+  if(msg.type==='duelStart'){receiveDuelStart(msg);return}
+  if(msg.type==='duelResult'){state.score+=msg.win?30:10;state.points+=msg.win?3:1;saveProgress();render();partyMsg(msg.win?`🏆 คุณชนะ Duel! +30 คะแนน`:`💥 คุณแพ้ Duel • +10 คะแนน`);return}
+}
+function joinParty(){
+  if(typeof Peer==='undefined'){partyMsg("โหลดระบบห้องออนไลน์ไม่สำเร็จ กรุณาเปิดอินเทอร์เน็ตแล้วรีเฟรชหน้า");return}
+  const code=document.getElementById("joinCode").value.trim().toUpperCase();
+  if(!/^[A-Z0-9]{6}$/.test(code)){partyMsg("กรุณากรอกรหัสห้อง 6 ตัว เช่น A7K2Q9");return}
+  destroyPartyPeer();party.role='guest';party.code=code;document.getElementById("partyCode").textContent=code;partyMsg("กำลังเชื่อมต่อห้อง...");
+  const peer=new Peer({debug:1});party.peer=peer;
+  peer.on('open',()=>{const conn=peer.connect(code,{reliable:true});setupPartyConnection(conn,'guest');});
+  peer.on('error',err=>partyMsg(err.type==='peer-unavailable'?"ไม่พบห้องนี้ หรือเจ้าของห้องปิดหน้าเกมแล้ว":"เชื่อมต่อไม่ได้: "+(err.type||err.message)));
+}
+function partyReady(){if(!party.connected||!party.conn?.open){partyMsg("ต้องสร้างหรือเข้าห้องให้สำเร็จก่อน");return}party.ready=true;party.conn.send({type:'ready',name:state.name});partyMsg(party.opponentReady?"⚔️ ทั้งสองคนพร้อมแล้ว • เจ้าของห้องเริ่มดวลได้":"🟢 คุณพร้อมแล้ว • รออีกคน");if(party.role==='host'&&party.opponentReady)startOnlineDuel()}
+function partyDuel(){if(!party.connected||!party.conn?.open){partyMsg("ยังไม่ได้เชื่อมต่อห้องออนไลน์");return}party.conn.send({type:'duelRequest',name:state.name});partyMsg("📨 ส่งคำท้าดวลแล้ว");}
+function snapshotTeam(){return state.team.filter(u=>u.hp>0).map(u=>{const st=getStats(u.id);return {id:u.id,cell:u.cell,hp:st.hp,atk:st.atk,def:st.def}})}
+function startOnlineDuel(){
+  if(party.role!=='host'||!party.connected||!party.opponentReady||!party.ready)return;
+  const my=snapshotTeam(); if(!my.length){partyMsg("วางตัวละครบนกระดานก่อนดวลออนไลน์");return}
+  party.conn.send({type:'duelStart',name:state.name,team:my});partyMsg("⚔️ ส่งทีมให้คู่แข่งแล้ว • กำลังจำลอง Duel...");
+}
+function simulateOnlineBattle(my,opp){
+  let a=my.map((u,i)=>({...u,hp:u.hp,maxHp:u.hp,cell:u.cell??(40+i),enemy:false}));
+  let b=opp.map((u,i)=>({...u,hp:u.hp,maxHp:u.hp,cell:u.cell??(i+1),enemy:true}));
+  for(let tick=0;tick<80;tick++){
+    const all=[...a,...b].filter(u=>u.hp>0);
+    for(const u of all){const foes=u.enemy?a:b;const alive=foes.filter(x=>x.hp>0);if(!alive.length)break;let t=alive.reduce((best,x)=>{const d=Math.abs((u.cell%8)-(x.cell%8))+Math.abs(Math.floor(u.cell/8)-Math.floor(x.cell/8));if(!best)return x;const bd=Math.abs((u.cell%8)-(best.cell%8))+Math.abs(Math.floor(u.cell/8)-Math.floor(best.cell/8));return d<bd?x:best},null);const d=Math.abs((u.cell%8)-(t.cell%8))+Math.abs(Math.floor(u.cell/8)-Math.floor(t.cell/8));if(d<=1)t.hp=Math.max(0,t.hp-Math.max(3,Math.round(u.atk-t.def*.45)));else{let r=Math.floor(u.cell/8),c=u.cell%8,tr=Math.floor(t.cell/8),tc=t.cell%8;u.cell=(Math.abs(tr-r)>=Math.abs(tc-c)?(r+Math.sign(tr-r))*8+c:(r*8+c+Math.sign(tc-c)))} }
+    if(!a.some(u=>u.hp>0)||!b.some(u=>u.hp>0))break;
+  }
+  return {aAlive:a.filter(u=>u.hp>0).length,bAlive:b.filter(u=>u.hp>0).length};
+}
+function receiveDuelStart(msg){
+  if(!party.conn)return;const my=snapshotTeam();if(!my.length){party.conn.send({type:'duelResult',win:false});partyMsg("คุณยังไม่มีตัวละครบนกระดาน");return}
+  const r=simulateOnlineBattle(my,msg.team);const win=r.aAlive>r.bAlive;party.conn.send({type:'duelResult',win:!win});state.score+=win?30:10;state.points+=win?3:1;saveProgress();render();partyMsg(win?"🏆 ชนะ Duel ออนไลน์! +30 คะแนน":"💥 แพ้ Duel ออนไลน์ • +10 คะแนน");
+}
+function copyCode(){let c=document.getElementById("partyCode").textContent;if(!/^[A-Z0-9]{6}$/.test(c)){partyMsg("ยังไม่มีรหัสห้อง");return}if(navigator.clipboard){navigator.clipboard.writeText(c).then(()=>partyMsg("คัดลอกรหัสแล้ว • ส่งให้เพื่อนได้เลย")).catch(()=>partyMsg("รหัสห้อง: "+c))}else partyMsg("รหัสห้อง: "+c)}
+</script>
+</body>
+</html>
